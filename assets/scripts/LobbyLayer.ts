@@ -1,4 +1,4 @@
-import { Color, Graphics, Label, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
+import { Color, Graphics, Label, LabelOutline, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
 
 export type LobbyAction = 'start' | 'daily' | 'supply' | 'notice' | 'guide' | 'invite' | 'desktop';
 type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; title: Label; subtitle: Label; width: number; height: number; x: number; y: number };
@@ -7,6 +7,7 @@ type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; title: Lab
 export class LobbyLayer {
   readonly node = new Node('CowRanchLobby');
   private background!: Sprite;
+  private logo!: Sprite;
   private title!: Label;
   private status!: Label;
   private buttons: LobbyButton[] = [];
@@ -23,8 +24,10 @@ export class LobbyLayer {
     backgroundNode.addComponent(UITransform);
     this.background = backgroundNode.addComponent(Sprite); this.background.sizeMode = Sprite.SizeMode.CUSTOM;
     resources.load('art/cow-ranch-lobby-v1/spriteFrame', SpriteFrame, (error, frame) => { if (!error && frame && this.background.isValid) this.background.spriteFrame = frame; });
-    this.title = this.label('Title', 52, new Color(255, 246, 208)); this.title.string = '对牛弹珠';
-    this.status = this.label('Status', 18, new Color(97, 68, 38));
+    const logoNode = new Node('CowMarbleLogo'); logoNode.parent = this.node; logoNode.addComponent(UITransform); this.logo = logoNode.addComponent(Sprite); this.logo.sizeMode = Sprite.SizeMode.CUSTOM;
+    resources.load('art/cow-marble-logo-v1/spriteFrame', SpriteFrame, (error, frame) => { if (!error && frame && this.logo.isValid) this.logo.spriteFrame = frame; });
+    this.title = this.label('Title', 52, new Color(255, 246, 208)); this.title.node.active = false;
+    this.status = this.label('Status', 25, new Color(93, 62, 29));
     this.addButton('start', '开始闯关', '发射弹珠，撞铃得分', new Color(235, 137, 45));
     this.addButton('daily', '每日补给', '每天领取牛币', new Color(83, 170, 218));
     this.addButton('supply', '免费补给', '看广告得奖励', new Color(255, 160, 72));
@@ -44,9 +47,10 @@ export class LobbyLayer {
     this.width = width; this.height = height;
     const backgroundTransform = this.background.node.getComponent(UITransform)!;
     backgroundTransform.setContentSize(width, height); this.background.node.setPosition(width / 2, height / 2);
-    this.title.node.setPosition(width / 2, height * .82); this.status.node.setPosition(width / 2, height * .76);
+    this.logo.node.setPosition(width / 2, height * .81); const logoWidth = Math.min(width * .76, 620); this.logo.node.getComponent(UITransform)!.setContentSize(logoWidth, logoWidth * .5);
+    this.title.node.setPosition(width / 2, height * .82); this.status.node.setPosition(width / 2, height * .72);
     // The mascot owns the lower-right area; keep every interactive control on the left.
-    const wide = Math.min(width * .46, 330), small = Math.min(width * .24, 172), h = Math.max(56, height * .063);
+    const wide = Math.min(width * .48, 350), small = Math.min(width * .27, 192), h = Math.max(68, height * .072);
     this.layoutButton('start', width * .33, height * .52, wide, h * 1.15);
     this.layoutButton('daily', width * .19, height * .425, small, h);
     this.layoutButton('supply', width * .47, height * .425, small, h);
@@ -72,10 +76,10 @@ export class LobbyLayer {
   private addButton(id: LobbyAction, title: string, subtitle: string, color: Color) {
     const node = new Node(`Lobby_${id}`); node.parent = this.node; node.addComponent(UITransform);
     const graphics = node.addComponent(Graphics);
-    const titleLabel = this.label(`${id}_title`, 24, new Color(255, 255, 255)); titleLabel.node.parent = node;
-    const subLabel = this.label(`${id}_subtitle`, 13, new Color(255, 247, 220)); subLabel.node.parent = node;
+    const titleLabel = this.label(`${id}_title`, id === 'start' ? 43 : 31, new Color(255, 255, 255)); titleLabel.node.parent = node;
+    const subLabel = this.label(`${id}_subtitle`, id === 'start' ? 18 : 15, new Color(255, 247, 220)); subLabel.node.parent = node;
     titleLabel.string = title; subLabel.string = subtitle;
-    titleLabel.node.setPosition(0, 9); subLabel.node.setPosition(0, -15);
+    titleLabel.node.setPosition(0, 12); subLabel.node.setPosition(0, -18);
     (node as Node & { buttonColor?: Color }).buttonColor = color;
     this.buttons.push({ id, node, graphics, title: titleLabel, subtitle: subLabel, width: 0, height: 0, x: 0, y: 0 });
   }
@@ -88,7 +92,7 @@ export class LobbyLayer {
     button.graphics.clear(); button.graphics.fillColor = new Color(50, 49, 34, 95); button.graphics.roundRect(-width / 2 + 2, -height / 2 - 3, width, height, height / 2); button.graphics.fill();
     button.graphics.fillColor = color; button.graphics.roundRect(-width / 2, -height / 2, width, height, height / 2); button.graphics.fill();
     button.graphics.fillColor = new Color(255, 255, 255, 38); button.graphics.roundRect(-width / 2 + 5, 2, width - 10, height / 2 - 7, height / 3); button.graphics.fill();
-    button.title.node.setPosition(0, height > 75 ? 13 : 8); button.subtitle.node.setPosition(0, height > 75 ? -18 : -14);
+    button.title.node.setPosition(0, height > 75 ? 15 : 10); button.subtitle.node.setPosition(0, height > 75 ? -22 : -17);
   }
 
   private createModal() {
@@ -111,6 +115,7 @@ export class LobbyLayer {
 
   private label(name: string, size: number, color: Color) {
     const node = new Node(name); node.parent = this.node; node.addComponent(UITransform).setContentSize(760, 72);
-    const label = node.addComponent(Label); label.fontSize = size; label.lineHeight = size + 8; label.color = color; label.horizontalAlign = Label.HorizontalAlign.CENTER; label.verticalAlign = Label.VerticalAlign.CENTER; return label;
+    const label = node.addComponent(Label); label.fontSize = size; label.lineHeight = size + 8; label.color = color; label.horizontalAlign = Label.HorizontalAlign.CENTER; label.verticalAlign = Label.VerticalAlign.CENTER;
+    const outline = node.addComponent(LabelOutline); outline.width = Math.max(2, Math.round(size * .08)); outline.color = new Color(76, 48, 29, 190); return label;
   }
 }
