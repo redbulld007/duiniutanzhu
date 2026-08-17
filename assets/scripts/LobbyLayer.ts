@@ -1,7 +1,7 @@
 import { Color, Graphics, Label, LabelOutline, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
 
 export type LobbyAction = 'start' | 'daily' | 'supply' | 'notice' | 'guide' | 'invite' | 'desktop';
-type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; title: Label; subtitle: Label; width: number; height: number; x: number; y: number };
+type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; title: Label; subtitle: Label; art: Sprite; width: number; height: number; x: number; y: number };
 
 /** Original home screen for the mobile-game loop. Platform actions are supplied by the game script. */
 export class LobbyLayer {
@@ -80,8 +80,10 @@ export class LobbyLayer {
     const subLabel = this.label(`${id}_subtitle`, id === 'start' ? 18 : 15, new Color(255, 247, 220)); subLabel.node.parent = node;
     titleLabel.string = title; subLabel.string = subtitle;
     titleLabel.node.setPosition(0, 12); subLabel.node.setPosition(0, -18);
+    const artNode = new Node(`${id}_art`); artNode.parent = node; artNode.addComponent(UITransform); const art = artNode.addComponent(Sprite); art.sizeMode = Sprite.SizeMode.CUSTOM;
+    resources.load(`art/lobby-${id}-label/spriteFrame`, SpriteFrame, (error, frame) => { if (!error && frame && art.isValid) { art.spriteFrame = frame; titleLabel.node.active = false; subLabel.node.active = false; } });
     (node as Node & { buttonColor?: Color }).buttonColor = color;
-    this.buttons.push({ id, node, graphics, title: titleLabel, subtitle: subLabel, width: 0, height: 0, x: 0, y: 0 });
+    this.buttons.push({ id, node, graphics, title: titleLabel, subtitle: subLabel, art, width: 0, height: 0, x: 0, y: 0 });
   }
 
   private layoutButton(id: LobbyAction, x: number, y: number, width: number, height: number) {
@@ -93,6 +95,7 @@ export class LobbyLayer {
     button.graphics.fillColor = color; button.graphics.roundRect(-width / 2, -height / 2, width, height, height / 2); button.graphics.fill();
     button.graphics.fillColor = new Color(255, 255, 255, 38); button.graphics.roundRect(-width / 2 + 5, 2, width - 10, height / 2 - 7, height / 3); button.graphics.fill();
     button.title.node.setPosition(0, height > 75 ? 15 : 10); button.subtitle.node.setPosition(0, height > 75 ? -22 : -17);
+    button.art.node.getComponent(UITransform)!.setContentSize(width * .9, height * .76); button.art.node.setPosition(0, 0);
   }
 
   private createModal() {
