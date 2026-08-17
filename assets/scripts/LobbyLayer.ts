@@ -45,14 +45,15 @@ export class LobbyLayer {
     const backgroundTransform = this.background.node.getComponent(UITransform)!;
     backgroundTransform.setContentSize(width, height); this.background.node.setPosition(width / 2, height / 2);
     this.title.node.setPosition(width / 2, height * .82); this.status.node.setPosition(width / 2, height * .76);
-    const wide = Math.min(width * .62, 390), small = Math.min(width * .39, 235), h = Math.max(61, height * .068);
-    this.layoutButton('start', width / 2, height * .48, wide, h * 1.15);
-    this.layoutButton('daily', width * .29, height * .39, small, h);
-    this.layoutButton('supply', width * .71, height * .39, small, h);
-    this.layoutButton('notice', width * .29, height * .305, small, h);
-    this.layoutButton('guide', width * .71, height * .305, small, h);
-    this.layoutButton('invite', width * .29, height * .22, small, h);
-    this.layoutButton('desktop', width * .71, height * .22, small, h);
+    // The mascot owns the lower-right area; keep every interactive control on the left.
+    const wide = Math.min(width * .46, 330), small = Math.min(width * .24, 172), h = Math.max(56, height * .063);
+    this.layoutButton('start', width * .33, height * .52, wide, h * 1.15);
+    this.layoutButton('daily', width * .19, height * .425, small, h);
+    this.layoutButton('supply', width * .47, height * .425, small, h);
+    this.layoutButton('notice', width * .19, height * .345, small, h);
+    this.layoutButton('guide', width * .47, height * .345, small, h);
+    this.layoutButton('invite', width * .19, height * .265, small, h);
+    this.layoutButton('desktop', width * .47, height * .265, small, h);
     this.layoutModal();
   }
 
