@@ -98,7 +98,12 @@ export class LobbyLayer {
     button.node.getComponent(UITransform)!.setContentSize(width, height);
     if (id !== 'start') {
       button.graphics.clear();
-      button.art.node.getComponent(UITransform)!.setContentSize(width * 1.18, height * 1.18); button.art.node.setPosition(0, 0);
+      button.art.node.getComponent(UITransform)!.setContentSize(width * 1.16, height * 1.16); button.art.node.setPosition(0, height * .10);
+      const tagWidth = width * .90, tagHeight = Math.max(28, height * .25);
+      button.graphics.fillColor = new Color(70, 43, 25, 165); button.graphics.roundRect(-tagWidth / 2 + 1, -height * .51 - 3, tagWidth, tagHeight, tagHeight / 2); button.graphics.fill();
+      button.graphics.fillColor = new Color(255, 236, 177); button.graphics.roundRect(-tagWidth / 2, -height * .51, tagWidth, tagHeight, tagHeight / 2); button.graphics.fill();
+      button.title.node.active = true; button.title.fontSize = Math.max(16, Math.round(height * .19)); button.title.lineHeight = button.title.fontSize + 4; button.title.color = new Color(94, 55, 29); button.title.node.setPosition(0, -height * .39);
+      button.subtitle.node.active = false;
       return;
     }
     const color = (button.node as Node & { buttonColor?: Color }).buttonColor!;
