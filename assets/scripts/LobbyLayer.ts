@@ -83,7 +83,7 @@ export class LobbyLayer {
     const subLabel = this.label(`${id}_subtitle`, id === 'start' ? 20 : 16, new Color(255, 247, 220)); subLabel.node.parent = node;
     titleLabel.string = title; subLabel.string = subtitle;
     titleLabel.node.setPosition(0, 12); subLabel.node.setPosition(0, -18);
-    const artNode = new Node(`${id}_art`); artNode.parent = node; artNode.addComponent(UITransform); const art = artNode.addComponent(Sprite); art.sizeMode = Sprite.SizeMode.CUSTOM;
+    const artNode = new Node(`${id}_art`); artNode.parent = node; artNode.setSiblingIndex(0); artNode.addComponent(UITransform); const art = artNode.addComponent(Sprite); art.sizeMode = Sprite.SizeMode.CUSTOM;
     if (id !== 'start') {
       resources.load(`art/lobby-icon-${id}-v1/spriteFrame`, SpriteFrame, (error, frame) => { if (!error && frame && art.isValid) art.spriteFrame = frame; });
       titleLabel.node.active = false; subLabel.node.active = false;
