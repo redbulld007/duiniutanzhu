@@ -1,7 +1,7 @@
 import { Color, Graphics, Label, LabelOutline, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
 
 export type LobbyAction = 'start' | 'daily' | 'supply' | 'notice' | 'guide' | 'invite' | 'desktop' | 'settings';
-type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; title: Label; subtitle: Label; art: Sprite; width: number; height: number; x: number; y: number };
+type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; tag: Graphics; title: Label; subtitle: Label; art: Sprite; width: number; height: number; x: number; y: number };
 
 /** Original home screen for the mobile-game loop. Platform actions are supplied by the game script. */
 export class LobbyLayer {
@@ -84,12 +84,13 @@ export class LobbyLayer {
     titleLabel.string = title; subLabel.string = subtitle;
     titleLabel.node.setPosition(0, 12); subLabel.node.setPosition(0, -18);
     const artNode = new Node(`${id}_art`); artNode.parent = node; artNode.setSiblingIndex(0); artNode.addComponent(UITransform); const art = artNode.addComponent(Sprite); art.sizeMode = Sprite.SizeMode.CUSTOM;
+    const tagNode = new Node(`${id}_tag`); tagNode.parent = node; tagNode.setSiblingIndex(1); tagNode.addComponent(UITransform); const tag = tagNode.addComponent(Graphics);
     if (id !== 'start') {
       resources.load(`art/lobby-icon-${id}-v1/spriteFrame`, SpriteFrame, (error, frame) => { if (!error && frame && art.isValid) art.spriteFrame = frame; });
       titleLabel.node.active = false; subLabel.node.active = false;
     }
     (node as Node & { buttonColor?: Color }).buttonColor = color;
-    this.buttons.push({ id, node, graphics, title: titleLabel, subtitle: subLabel, art, width: 0, height: 0, x: 0, y: 0 });
+    this.buttons.push({ id, node, graphics, tag, title: titleLabel, subtitle: subLabel, art, width: 0, height: 0, x: 0, y: 0 });
   }
 
   private layoutButton(id: LobbyAction, x: number, y: number, width: number, height: number) {
@@ -100,12 +101,13 @@ export class LobbyLayer {
       button.graphics.clear();
       button.art.node.getComponent(UITransform)!.setContentSize(width * 1.16, height * 1.16); button.art.node.setPosition(0, height * .10);
       const tagWidth = width * .90, tagHeight = Math.max(28, height * .25);
-      button.graphics.fillColor = new Color(70, 43, 25, 165); button.graphics.roundRect(-tagWidth / 2 + 1, -height * .51 - 3, tagWidth, tagHeight, tagHeight / 2); button.graphics.fill();
-      button.graphics.fillColor = new Color(255, 236, 177); button.graphics.roundRect(-tagWidth / 2, -height * .51, tagWidth, tagHeight, tagHeight / 2); button.graphics.fill();
+      button.tag.clear(); button.tag.fillColor = new Color(70, 43, 25, 185); button.tag.roundRect(-tagWidth / 2 + 1, -height * .51 - 3, tagWidth, tagHeight, tagHeight / 2); button.tag.fill();
+      button.tag.fillColor = new Color(255, 236, 177); button.tag.roundRect(-tagWidth / 2, -height * .51, tagWidth, tagHeight, tagHeight / 2); button.tag.fill();
       button.title.node.active = true; button.title.fontSize = Math.max(16, Math.round(height * .19)); button.title.lineHeight = button.title.fontSize + 4; button.title.color = new Color(94, 55, 29); button.title.node.setPosition(0, -height * .39);
       button.subtitle.node.active = false;
       return;
     }
+    button.tag.clear();
     const color = (button.node as Node & { buttonColor?: Color }).buttonColor!;
     button.graphics.clear(); button.graphics.fillColor = new Color(50, 49, 34, 135); button.graphics.roundRect(-width / 2 + 2, -height / 2 - 5, width, height, height / 2); button.graphics.fill();
     button.graphics.fillColor = new Color(255, 244, 194); button.graphics.roundRect(-width / 2 - 3, -height / 2 - 3, width + 6, height + 6, height / 2 + 3); button.graphics.fill();
