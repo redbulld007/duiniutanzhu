@@ -8,7 +8,7 @@ import { UpgradeKind, UpgradeLayer } from './UpgradeLayer';
 import { HeroId } from './HeroCatalog';
 import { HeroSelectionLayer } from './HeroSelectionLayer';
 import { UpgradeDefinition, UpgradeId, rollUpgrades } from './UpgradeCatalog';
-import { BUILTIN_LAYOUTS, LevelLayout, loadCustomLayout } from './LevelLayout';
+import { BUILTIN_LAYOUTS, LevelLayout, PegType, loadCustomLayout } from './LevelLayout';
 import { LevelEditorLayer } from './LevelEditorLayer';
 const { ccclass } = _decorator;
 type Peg = { pos: Vec2 };
@@ -17,15 +17,17 @@ type Peg = { pos: Vec2 };
 @ccclass('GoblinMarbleMvp')
 export class GoblinMarbleMvp extends Component {
   private root!: Node; private g!: Graphics; private guide!: Graphics; private hud!: Label; private tip!: Label; private home!: Label; private lobby!: LobbyLayer; private upgrades!: UpgradeLayer; private heroes!: HeroSelectionLayer; private editor!: LevelEditorLayer;
-  private backgroundVisual!: Sprite; private boardFrameVisual!: Sprite; private boardVisuals!: Node; private actorVisuals!: Node; private launcherVisual!: Sprite; private ballVisual!: Sprite; private cloneVisual!: Sprite;
+  private backgroundVisual!: Sprite; private boardFrameVisual!: Sprite; private boardVisuals!: Node; private actorVisuals!: Node; private effectVisuals!: Node; private launcherVisual!: Sprite; private ballVisual!: Sprite; private cloneVisual!: Sprite;
   private pegVisuals = new Map<number, Sprite>(); private resetVisual!: Sprite; private bombVisual!: Sprite;
   private size = new Vec2(); private launcher = new Vec2(); private pointer = new Vec2();
   private ball = new Vec2(); private pegs: Peg[] = [];
   private resetPeg = new Vec2(); private bombPeg = new Vec2(); private bombUsed = false;
   private physicsRoot!: Node; private ballNode!: Node; private ballBody!: RigidBody2D; private ballCollider!: CircleCollider2D; private cloneNode!: Node; private cloneBody!: RigidBody2D; private cloneCollider!: CircleCollider2D;
   private pegColliders = new Map<number, CircleCollider2D>();
+  private bonusPegs = new Map<number, { pos: Vec2; type: PegType; sprite: Sprite; used: boolean }>();
   private hit = new Map<number, number>(); private aiming = false; private flying = false; private resolving = false; private over = false;
   private timer = 0; private score = 0; private targetScore = 100; private levelWon = false; private stage = 1; private bestStage = 1; private coins = 0; private baseBalls = 4; private ballsLeft = 4;
+  private idleTime = 0; private shakeTime = 0; private shakeStrength = 0;
   private bounceBonus = 0; private scoreBonus = 0; private splitEvery = 5; private ballRadius = 16; private launchSpeed = 760;
   private bombRadius = 115; private resetBonus = 0; private luckyChance = 0; private harvestBonus = 0; private echoCounter = 0; private shieldAvailable = false; private magnetStrength = 0; private rainbowBonus = false; private goldenShotAvailable = false; private milkShieldAvailable = false; private aftershock = 0; private radarBonus = 0;
   private selectedHero: HeroId = 'oldOx'; private heroEchoAvailable = false; private firstShot = true; private forcedSpring = false; private forcedSplit = false;
@@ -45,6 +47,7 @@ export class GoblinMarbleMvp extends Component {
     const aim = new Node('Aim'); aim.parent = this.root; this.guide = aim.addComponent(Graphics);
     this.boardVisuals = new Node('BoardVisuals'); this.boardVisuals.parent = this.root;
     this.actorVisuals = new Node('ActorVisuals'); this.actorVisuals.parent = this.root;
+    this.effectVisuals = new Node('EffectVisuals'); this.effectVisuals.parent = this.root;
     this.launcherVisual = this.createSprite(this.actorVisuals, 'cow-launcher-v1', 190);
     this.ballVisual = this.createSprite(this.actorVisuals, 'ball-standard-v1', 52);
     this.cloneVisual = this.createSprite(this.actorVisuals, 'ball-standard-v1', 44); this.cloneVisual.node.active=false;
@@ -58,7 +61,7 @@ export class GoblinMarbleMvp extends Component {
   }
   start() { this.resize(); this.setupPhysics(); this.board(); this.tip.string = '从顶部向下拖动，松开发射'; this.openLobby(); GameTelemetry.track('game_start', { stage: this.stage, bestStage: this.bestStage }); }
   onDestroy() { input.off(Input.EventType.TOUCH_START, this.down, this); input.off(Input.EventType.TOUCH_MOVE, this.move, this); input.off(Input.EventType.TOUCH_END, this.up, this); }
-  update(dt: number) { this.resize(); if (this.flying) { this.ball.set(this.ballNode.position.x, this.ballNode.position.y); this.applyMagnet(); if (this.ballNode.active && this.ball.y < this.playBottom - this.ballRadius) this.saveOrLose(this.ballNode); if (this.cloneNode.active && this.cloneNode.position.y < this.playBottom - this.ballRadius) this.cloneNode.active=false; if(!this.ballNode.active&&!this.cloneNode.active)this.finishShot(); } if (this.resolving) this.resolve(dt); this.draw(); }
+  update(dt: number) { this.idleTime += dt; if(this.shakeTime>0){this.shakeTime-=dt;} this.resize(); if (this.flying) { this.ball.set(this.ballNode.position.x, this.ballNode.position.y); this.applyMagnet(); if (this.ballNode.active && this.ball.y < this.playBottom - this.ballRadius) this.saveOrLose(this.ballNode); if (this.cloneNode.active && this.cloneNode.position.y < this.playBottom - this.ballRadius) this.cloneNode.active=false; if(!this.ballNode.active&&!this.cloneNode.active)this.finishShot(); } if (this.resolving) this.resolve(dt); this.draw(); }
 
   private setupPhysics() {
     PhysicsSystem2D.instance.gravity = new Vec2(0, -1300);
@@ -89,8 +92,9 @@ export class GoblinMarbleMvp extends Component {
   }
   private resize() {
     const ui = this.node.getComponent(UITransform);
-    if (ui) { this.size.set(ui.contentSize.width, ui.contentSize.height); this.root.setPosition(-this.size.x * ui.anchorPoint.x, -this.size.y * ui.anchorPoint.y); }
-    else { const v = view.getVisibleSize(); this.size.set(v.width,v.height); this.root.setPosition(-v.width/2,-v.height/2); }
+    const shakeX=this.shakeTime>0?(Math.random()-.5)*this.shakeStrength:0, shakeY=this.shakeTime>0?(Math.random()-.5)*this.shakeStrength:0;
+    if (ui) { this.size.set(ui.contentSize.width, ui.contentSize.height); this.root.setPosition(-this.size.x * ui.anchorPoint.x+shakeX, -this.size.y * ui.anchorPoint.y+shakeY); }
+    else { const v = view.getVisibleSize(); this.size.set(v.width,v.height); this.root.setPosition(-v.width/2+shakeX,-v.height/2+shakeY); }
     this.playLeft=Math.max(48,this.size.x*.085); this.playRight=this.size.x-this.playLeft; this.playBottom=Math.max(110,this.size.y*.135); this.launcher.set(this.size.x/2,this.size.y*.765); this.playTop=this.launcher.y+54;
     this.hud.node.setPosition(this.size.x/2,this.size.y-45); this.tip.node.setPosition(this.size.x/2,this.playBottom-46); this.home.node.setPosition(72,this.size.y-45);
     const backgroundTransform=this.backgroundVisual.node.getComponent(UITransform); backgroundTransform?.setContentSize(this.size.x,this.size.y); this.backgroundVisual.node.setPosition(this.size.x/2,this.size.y/2);
@@ -103,11 +107,14 @@ export class GoblinMarbleMvp extends Component {
   private board() {
     if (this.physicsRoot) this.physicsRoot.removeAllChildren();
     if (this.physicsRoot) { this.physicsRoot.addChild(this.ballNode); this.physicsRoot.addChild(this.cloneNode); this.ballNode.active = false; this.cloneNode.active=false; }
-    this.hit.clear(); this.pegColliders.clear(); this.bombUsed=false; this.pegs=[]; const layoutIndex=(this.stage-1)%BUILTIN_LAYOUTS.length; const layout=loadCustomLayout() ?? BUILTIN_LAYOUTS[layoutIndex]; const top=this.launcher.y-92, bottom=this.playBottom+84;
+    this.hit.clear(); this.pegColliders.clear(); this.bonusPegs.clear(); this.bombUsed=false; this.pegs=[]; const layoutIndex=(this.stage-1)%BUILTIN_LAYOUTS.length; const layout=loadCustomLayout() ?? BUILTIN_LAYOUTS[layoutIndex]; const top=this.launcher.y-92, bottom=this.playBottom+84;
     layout.pegs.filter((peg)=>peg.type==='normal').forEach((peg) => this.pegs.push({pos:new Vec2(this.playLeft+peg.x*(this.playRight-this.playLeft), bottom+peg.y*(top-bottom))}));
     this.pegs.forEach((peg, i) => this.pegColliders.set(i, PhysicsBoardFactory.circle(this.physicsRoot, `Peg_${i}`, peg.pos, this.pegR, i + 1)));
     const specialPositions=[[.24,.47,.76,.57],[.76,.43,.25,.63],[.5,.55,.78,.35]][layoutIndex];
     this.resetPeg.set(this.playLeft+(this.playRight-this.playLeft)*specialPositions[0], this.playBottom+(this.playTop-this.playBottom)*specialPositions[1]); this.bombPeg.set(this.playLeft+(this.playRight-this.playLeft)*specialPositions[2], this.playBottom+(this.playTop-this.playBottom)*specialPositions[3]);
+    const placedReset=layout.pegs.find((peg)=>peg.type==='reset'), placedBomb=layout.pegs.find((peg)=>peg.type==='bomb');
+    if(placedReset)this.resetPeg.set(this.playLeft+placedReset.x*(this.playRight-this.playLeft),bottom+placedReset.y*(top-bottom));
+    if(placedBomb)this.bombPeg.set(this.playLeft+placedBomb.x*(this.playRight-this.playLeft),bottom+placedBomb.y*(top-bottom));
     PhysicsBoardFactory.circle(this.physicsRoot, 'ResetPeg', this.resetPeg, this.pegR + 3, 201);
     PhysicsBoardFactory.circle(this.physicsRoot, 'BombPeg', this.bombPeg, this.pegR + 3, 202);
     PhysicsBoardFactory.box(this.physicsRoot, 'WallLeft', new Vec2(this.playLeft-8, (this.playTop+this.playBottom)/2), new Size(16, this.playTop-this.playBottom));
@@ -117,6 +124,8 @@ export class GoblinMarbleMvp extends Component {
     this.pegs.forEach((peg, index) => { const sprite=this.createSprite(this.boardVisuals, 'pin-green-v1', 70); sprite.node.setPosition(peg.pos.x,peg.pos.y); this.pegVisuals.set(index,sprite); });
     this.resetVisual=this.createSprite(this.boardVisuals,'pin-reset-v1',80); this.resetVisual.node.setPosition(this.resetPeg.x,this.resetPeg.y);
     this.bombVisual=this.createSprite(this.boardVisuals,'pin-bomb-v1',80); this.bombVisual.node.setPosition(this.bombPeg.x,this.bombPeg.y);
+    let specialTag=203;
+    layout.pegs.filter((peg)=>['normal','reset','bomb'].indexOf(peg.type)<0).forEach((peg)=>{const pos=new Vec2(this.playLeft+peg.x*(this.playRight-this.playLeft),bottom+peg.y*(top-bottom));PhysicsBoardFactory.circle(this.physicsRoot,`Bonus_${specialTag}`,pos,this.pegR+2,specialTag);const sprite=this.createSprite(this.boardVisuals,'pin-green-v1',76);sprite.node.setPosition(pos.x,pos.y);sprite.color=this.bonusColor(peg.type);this.bonusPegs.set(specialTag,{pos,type:peg.type,sprite,used:false});specialTag++;});
   }
   private down(e: TouchEventLike) {
     this.pointer.set(e.getUILocation().x,e.getUILocation().y);
@@ -134,15 +143,16 @@ export class GoblinMarbleMvp extends Component {
     if(!this.aiming) return; this.pointer.set(e.getUILocation().x,e.getUILocation().y); this.aiming=false; PegSound.unlock();
     const d=this.pointer.clone().subtract(this.launcher); if(d.y>=-35) return; d.normalize();
     if(this.ballsLeft<=0){this.over=true;this.tip.string='弹珠用尽！轻触屏幕重试本关';return;}
-    this.ballsLeft--; this.shotIndex++; this.splitBall=this.forcedSplit || this.shotIndex%this.splitEvery===0; this.splitTriggered=false; this.springBall=!this.splitBall&&(this.forcedSpring || this.shotIndex%3===0); this.forcedSplit=false; this.forcedSpring=false; this.heroEchoAvailable=this.selectedHero==='grandpaBull'; this.ballCollider.restitution=Math.min(1.25,this.retain+this.bounceBonus+(this.springBall ? .16 : 0)); this.ballCollider.apply(); this.cloneCollider.restitution=this.ballCollider.restitution; this.cloneCollider.apply(); this.ball.set(this.launcher); this.ballNode.setPosition(this.launcher.x, this.launcher.y); this.ballNode.active=true; this.cloneNode.active=false; this.ballBody.linearVelocity=d.multiplyScalar(this.launchSpeed); this.flying=true; this.firstShot=false; this.tip.string=this.splitBall?'分裂球！首次撞钉后分成两颗':this.springBall?'高弹力球！本次反弹更强':'绿钉 3 分，蓝钉 2 分，灰钉 1 分'; GameTelemetry.track('shot_start', { stage: this.stage, shot: this.shotIndex, ballsLeft:this.ballsLeft, ballType: this.splitBall ? 'split' : this.springBall ? 'spring' : 'normal', hero: this.selectedHero });
+    this.ballsLeft--; this.shotIndex++; this.splitBall=this.forcedSplit || this.shotIndex%this.splitEvery===0; this.splitTriggered=false; this.springBall=!this.splitBall&&(this.forcedSpring || this.shotIndex%3===0); this.forcedSplit=false; this.forcedSpring=false; this.heroEchoAvailable=this.selectedHero==='grandpaBull'; this.ballCollider.restitution=Math.min(1.25,this.retain+this.bounceBonus+(this.springBall ? .16 : 0)); this.ballCollider.apply(); this.cloneCollider.restitution=this.ballCollider.restitution; this.cloneCollider.apply(); this.ball.set(this.launcher); this.ballNode.setPosition(this.launcher.x, this.launcher.y); this.ballNode.active=true; this.cloneNode.active=false; this.ballBody.linearVelocity=d.multiplyScalar(this.launchSpeed); this.launchBurst(); this.flying=true; this.firstShot=false; this.tip.string=this.splitBall?'分裂球！首次撞钉后分成两颗':this.springBall?'高弹力球！本次反弹更强':'绿钉 3 分，蓝钉 2 分，灰钉 1 分'; GameTelemetry.track('shot_start', { stage: this.stage, shot: this.shotIndex, ballsLeft:this.ballsLeft, ballType: this.splitBall ? 'split' : this.springBall ? 'spring' : 'normal', hero: this.selectedHero });
   }
   private onBallContact(self: Collider2D, other: Collider2D) {
     if (!this.flying) return;
-    if (other.tag > 0 && other.tag < 100) { this.scorePeg(other.tag - 1); if(this.heroEchoAvailable){this.heroEchoAvailable=false;this.addBonusScore(4,this.pegs[other.tag-1].pos,'牛爷爷回响');} if(this.splitBall&&!this.splitTriggered){this.splitTriggered=true;const body=self.node.getComponent(RigidBody2D)!;const pos=self.node.position;const velocity=body.linearVelocity;this.scheduleOnce(()=>{this.cloneNode.setPosition(pos.x,pos.y);this.cloneNode.active=true;this.cloneBody.linearVelocity=new Vec2(-velocity.x*.72,velocity.y*.9);},0);} }
-    if (other.tag === 201) { const nextPosition=new Vec2(this.playLeft+50 + Math.random()*(this.playRight-this.playLeft-100), this.playBottom+100 + Math.random()*(this.playTop-this.playBottom-210)); this.hit.clear(); this.addBonusScore(this.resetBonus,this.resetPeg,'丰收重置'); this.tip.string='全盘重置！所有普通钉子恢复绿色'; PegSound.play('reset'); GameTelemetry.track('special_hit', { stage: this.stage, kind: 'reset' }); this.scheduleOnce(() => { this.pegColliders.forEach((collider) => collider.enabled=true); this.resetPeg.set(nextPosition); other.node.setPosition(nextPosition.x,nextPosition.y); other.apply(); }, 0); }
-    if (other.tag === 202 && !this.bombUsed) { this.bombUsed=true; other.enabled=false; PegSound.play('bomb'); GameTelemetry.track('special_hit', { stage: this.stage, kind: 'bomb' }); this.pegs.forEach((peg,index)=>{if(peg.pos.clone().subtract(this.bombPeg).length()<this.bombRadius+this.aftershock)this.scorePeg(index);}); this.tip.string='爆炸钉子！附近钉子全部触发'; }
+    if (other.tag > 0 && other.tag < 100) { this.scorePeg(other.tag - 1); if(this.heroEchoAvailable){this.heroEchoAvailable=false;this.addBonusScore(4,this.pegs[other.tag-1].pos,'牛爷爷回响');} if(this.splitBall&&!this.splitTriggered){this.splitTriggered=true;const body=self.node.getComponent(RigidBody2D)!;const pos=self.node.position;const velocity=body.linearVelocity;this.hitImpact(new Vec2(pos.x,pos.y),new Color(127,205,255),1.6);this.scheduleOnce(()=>{this.cloneNode.setPosition(pos.x,pos.y);this.cloneNode.active=true;this.cloneBody.linearVelocity=new Vec2(-velocity.x*.72,velocity.y*.9);},0);} }
+    if (other.tag === 201) { const nextPosition=new Vec2(this.playLeft+50 + Math.random()*(this.playRight-this.playLeft-100), this.playBottom+100 + Math.random()*(this.playTop-this.playBottom-210)); this.hit.clear(); this.hitImpact(this.resetPeg,new Color(211,113,248),2); this.addBonusScore(this.resetBonus,this.resetPeg,'丰收重置'); this.tip.string='全盘重置！所有普通钉子恢复绿色'; PegSound.play('reset'); GameTelemetry.track('special_hit', { stage: this.stage, kind: 'reset' }); this.scheduleOnce(() => { this.pegColliders.forEach((collider) => collider.enabled=true); this.resetPeg.set(nextPosition); other.node.setPosition(nextPosition.x,nextPosition.y); other.apply(); }, 0); }
+    if (other.tag === 202 && !this.bombUsed) { this.bombUsed=true; other.enabled=false; this.hitImpact(this.bombPeg,new Color(255,119,64),3); this.shake(.22,15); PegSound.play('bomb'); GameTelemetry.track('special_hit', { stage: this.stage, kind: 'bomb' }); this.pegs.forEach((peg,index)=>{if(peg.pos.clone().subtract(this.bombPeg).length()<this.bombRadius+this.aftershock)this.scorePeg(index);}); this.tip.string='爆炸钉子！附近钉子全部触发'; }
+    if(other.tag>=203){this.hitBonusPeg(other.tag,self,other);}
   }
-  private scorePeg(index:number) { const count=this.hit.get(index)??0; if(count>=this.maxHitsPerPeg)return; const next=count+1; let points=[3,2,1][count]+this.scoreBonus; if(this.luckyChance&&Math.random()<this.luckyChance)points*=2; if(this.rainbowBonus)points+=Math.floor(Math.random()*4); if(this.goldenShotAvailable){points+=10;this.goldenShotAvailable=false;} this.hit.set(index,next); this.score+=points; this.echoCounter++; if(this.echoCounter%4===0)this.addBonusScore(4,this.pegs[index].pos,'铃铛回响'); PegSound.play(count===0?'green':count===1?'blue':'gray'); GameTelemetry.track('peg_hit', { stage: this.stage, points, pegState: next, score: this.score }); this.scorePopup(points,this.pegs[index].pos); if(next===this.maxHitsPerPeg)this.pegColliders.get(index)!.enabled=false; this.tip.string=`+${points} 分！当前 ${this.score}/${this.targetScore}`; if(this.score>=this.targetScore)this.levelWon=true; }
+  private scorePeg(index:number) { const count=this.hit.get(index)??0; if(count>=this.maxHitsPerPeg)return; const next=count+1; let points=[3,2,1][count]+this.scoreBonus; if(this.luckyChance&&Math.random()<this.luckyChance)points*=2; if(this.rainbowBonus)points+=Math.floor(Math.random()*4); if(this.goldenShotAvailable){points+=10;this.goldenShotAvailable=false;} this.hit.set(index,next); this.score+=points; this.hitImpact(this.pegs[index].pos, count===0?new Color(106,225,118):count===1?new Color(102,190,255):new Color(214,220,231), next===this.maxHitsPerPeg?1.15:.8); const pegSprite=this.pegVisuals.get(index); if(pegSprite)tween(pegSprite.node).stop().to(.06,{scale:new Vec3(1.28,1.28,1)}).to(.14,{scale:Vec3.ONE}).start(); this.echoCounter++; if(this.echoCounter%4===0)this.addBonusScore(4,this.pegs[index].pos,'铃铛回响'); PegSound.play(count===0?'green':count===1?'blue':'gray'); GameTelemetry.track('peg_hit', { stage: this.stage, points, pegState: next, score: this.score }); this.scorePopup(points,this.pegs[index].pos); if(next===this.maxHitsPerPeg)this.pegColliders.get(index)!.enabled=false; this.tip.string=`+${points} 分！当前 ${this.score}/${this.targetScore}`; if(this.score>=this.targetScore)this.levelWon=true; }
   private scorePopup(points:number, position:Vec2) { const node=new Node('ScorePopup'); node.parent=this.root; node.setPosition(position.x,position.y+20); node.addComponent(UITransform).setContentSize(90,50); const label=node.addComponent(Label); label.string=`+${points}`; label.fontSize=30; label.lineHeight=34; label.color=points===3?new Color(255,228,72):points===2?new Color(104,200,255):new Color(225,225,225); label.horizontalAlign=Label.HorizontalAlign.CENTER; const opacity=node.addComponent(UIOpacity); tween(node).to(.32,{position:new Vec3(position.x,position.y+75,0)}).call(()=>node.destroy()).start(); tween(opacity).delay(.14).to(.18,{opacity:0}).start(); }
   private finishShot() {
     if (!this.flying) return;
@@ -182,6 +192,13 @@ export class GoblinMarbleMvp extends Component {
   private saveOrLose(ball:Node){if(this.milkShieldAvailable&&ball===this.ballNode){this.milkShieldAvailable=false;ball.setPosition(this.launcher.x,this.playBottom+130);this.ballBody.linearVelocity=new Vec2(0,450);this.tip.string='奶泡护盾救回弹珠！';return;}ball.active=false;}
   private applyMagnet(){if(!this.magnetStrength)return;const body=this.ballBody;if(!this.ballNode.active)return;let best:Vec2|undefined;let distance=999;this.pegs.forEach((peg,index)=>{if((this.hit.get(index)??0)>=this.maxHitsPerPeg)return;const d=peg.pos.clone().subtract(this.ball);const len=d.length();if(len<distance){distance=len;best=d;}});if(best&&distance<210){best.normalize();body.linearVelocity=body.linearVelocity.add(best.multiplyScalar(this.magnetStrength*.018));}}
   private addBonusScore(points:number,position:Vec2,label:string){if(points<=0)return;this.score+=points;this.scorePopup(points,position);this.tip.string=`${label} +${points} 分！`;if(this.score>=this.targetScore)this.levelWon=true;}
+  private hitBonusPeg(tag:number,self:Collider2D,other:Collider2D){const peg=this.bonusPegs.get(tag);if(!peg||peg.used)return;peg.used=true;other.enabled=false;peg.sprite.node.active=false;const color=this.bonusColor(peg.type);this.hitImpact(peg.pos,color,peg.type==='prism'?2.2:1.5);if(peg.type==='gold'){this.addBonusScore(12,peg.pos,'黄金钉');this.coins+=3;}if(peg.type==='spring'){const body=self.node.getComponent(RigidBody2D)!;body.linearVelocity=new Vec2(body.linearVelocity.x,Math.max(760,Math.abs(body.linearVelocity.y)+300));this.addBonusScore(5,peg.pos,'弹簧钉');}if(peg.type==='split'){this.splitBall=true;this.splitTriggered=false;this.triggerSplit(self);this.addBonusScore(5,peg.pos,'分裂钉');}if(peg.type==='coin'){this.coins+=15;this.addBonusScore(4,peg.pos,'牛币钉');}if(peg.type==='prism'){const roll=Math.floor(Math.random()*3);if(roll===0)this.addBonusScore(15,peg.pos,'彩虹棱镜');if(roll===1){this.springBall=true;this.addBonusScore(8,peg.pos,'高弹棱镜');}if(roll===2){this.splitBall=true;this.splitTriggered=false;this.triggerSplit(self);this.addBonusScore(8,peg.pos,'分裂棱镜');}}
+  }
+  private triggerSplit(self:Collider2D){if(this.splitTriggered)return;this.splitTriggered=true;const body=self.node.getComponent(RigidBody2D)!;const pos=self.node.position;const velocity=body.linearVelocity;this.hitImpact(new Vec2(pos.x,pos.y),new Color(127,205,255),1.6);this.scheduleOnce(()=>{this.cloneNode.setPosition(pos.x,pos.y);this.cloneNode.active=true;this.cloneBody.linearVelocity=new Vec2(-velocity.x*.72,velocity.y*.9);},0);}
+  private bonusColor(type:PegType){if(type==='gold'||type==='coin')return new Color(246,190,51);if(type==='spring')return new Color(255,111,181);if(type==='split')return new Color(95,173,250);if(type==='prism')return new Color(151,103,238);return new Color(83,196,112);}
+  private launchBurst(){this.hitImpact(this.launcher,new Color(255,228,105),1.5);this.shake(.10,5);tween(this.launcherVisual.node).stop().to(.06,{scale:new Vec3(.84,.84,1)}).to(.18,{scale:new Vec3(1.08,1.08,1)}).to(.12,{scale:Vec3.ONE}).start();}
+  private hitImpact(position:Vec2,color:Color,power:number){const node=new Node('Impact');node.parent=this.effectVisuals;node.setPosition(position.x,position.y);node.addComponent(UITransform).setContentSize(160,160);const g=node.addComponent(Graphics);g.lineWidth=5;g.strokeColor=color;g.circle(0,0,13);g.stroke();for(let i=0;i<7;i++){const angle=i*Math.PI*2/7;g.moveTo(Math.cos(angle)*19,Math.sin(angle)*19);g.lineTo(Math.cos(angle)*38,Math.sin(angle)*38);g.stroke();}const opacity=node.addComponent(UIOpacity);tween(node).to(.22,{scale:new Vec3(power,power,1)}).call(()=>node.destroy()).start();tween(opacity).to(.20,{opacity:0}).start();this.shake(.06,Math.round(5*power));}
+  private shake(duration:number,strength:number){this.shakeTime=Math.max(this.shakeTime,duration);this.shakeStrength=Math.max(this.shakeStrength,strength);}
   private draw() {
     this.g.clear();this.guide.clear();this.g.fillColor=new Color(12,50,61,18);this.g.rect(0,0,this.size.x,this.size.y);this.g.fill();this.g.fillColor=new Color(255,252,231,118);this.g.roundRect(this.playLeft+20,this.size.y-84,this.playRight-this.playLeft-40,60,28);this.g.fill();
     this.pegs.forEach((p,i)=>{const count=this.hit.get(i)??0;if(count>=this.maxHitsPerPeg)return;this.g.fillColor=count===0?new Color(83,196,112):count===1?new Color(76,151,232):new Color(120,128,143);this.g.circle(p.pos.x,p.pos.y,this.pegR);this.g.fill();});
@@ -195,6 +212,7 @@ export class GoblinMarbleMvp extends Component {
     this.resetVisual.node.setPosition(this.resetPeg.x,this.resetPeg.y);
     this.bombVisual.node.active=!this.bombUsed;
     this.launcherVisual.node.setPosition(this.launcher.x,this.launcher.y);
+    if(!this.flying&&this.launcherVisual.node.scale.x===1)this.launcherVisual.node.setScale(1+Math.sin(this.idleTime*2.4)*.018,1+Math.sin(this.idleTime*2.4)*.018,1);
     this.ballVisual.node.active=this.ballNode.active;
     this.setSprite(this.ballVisual,this.springBall?'ball-spring-v1':'ball-standard-v1');
     this.ballVisual.node.getComponent(UITransform)?.setContentSize(this.ballRadius*3.25,this.ballRadius*3.25);this.ballVisual.node.setPosition(this.ball.x,this.ball.y);
