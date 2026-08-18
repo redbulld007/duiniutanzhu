@@ -1,6 +1,6 @@
 import { Color, Graphics, Label, LabelOutline, Node, resources, Sprite, SpriteFrame, UITransform } from 'cc';
 
-export type LobbyAction = 'start' | 'daily' | 'supply' | 'notice' | 'guide' | 'invite' | 'desktop';
+export type LobbyAction = 'start' | 'daily' | 'supply' | 'notice' | 'guide' | 'invite' | 'desktop' | 'settings';
 type LobbyButton = { id: LobbyAction; node: Node; graphics: Graphics; title: Label; subtitle: Label; art: Sprite; width: number; height: number; x: number; y: number };
 
 /** Original home screen for the mobile-game loop. Platform actions are supplied by the game script. */
@@ -35,6 +35,7 @@ export class LobbyLayer {
     this.addButton('guide', '玩法图鉴', '钉子与弹珠', new Color(135, 114, 214));
     this.addButton('invite', '邀请好友', '分享牧场', new Color(221, 104, 145));
     this.addButton('desktop', '快捷入口', '添加到桌面', new Color(72, 151, 185));
+    this.addButton('settings', '设置', '音乐与音效', new Color(118, 137, 151));
     this.createModal();
   }
 
@@ -52,12 +53,14 @@ export class LobbyLayer {
     // Clear hierarchy: one dominant play button, then six compact side entrances.
     const mainW = Math.min(width * .62, 470), mainH = Math.max(94, height * .105), smallW = Math.min(width * .30, 220), smallH = Math.max(70, height * .07);
     this.layoutButton('start', width * .50, height * .545, mainW, mainH);
-    this.layoutButton('daily', width * .20, height * .59, smallW, smallH);
-    this.layoutButton('supply', width * .80, height * .59, smallW, smallH);
-    this.layoutButton('notice', width * .19, height * .46, smallW, smallH);
-    this.layoutButton('guide', width * .81, height * .46, smallW, smallH);
-    this.layoutButton('invite', width * .22, height * .33, smallW, smallH);
-    this.layoutButton('desktop', width * .50, height * .305, Math.min(width * .42, 320), smallH);
+    const icon = Math.max(smallH * 1.25, Math.min(width * .18, 146));
+    this.layoutButton('daily', width * .16, height * .61, icon, icon);
+    this.layoutButton('supply', width * .84, height * .61, icon, icon);
+    this.layoutButton('notice', width * .16, height * .44, icon, icon);
+    this.layoutButton('guide', width * .84, height * .44, icon, icon);
+    this.layoutButton('invite', width * .18, height * .275, icon, icon);
+    this.layoutButton('desktop', width * .80, height * .275, icon, icon);
+    this.layoutButton('settings', width * .89, height * .88, Math.max(58, icon * .67), Math.max(58, icon * .67));
     this.layoutModal();
   }
 
@@ -81,7 +84,10 @@ export class LobbyLayer {
     titleLabel.string = title; subLabel.string = subtitle;
     titleLabel.node.setPosition(0, 12); subLabel.node.setPosition(0, -18);
     const artNode = new Node(`${id}_art`); artNode.parent = node; artNode.addComponent(UITransform); const art = artNode.addComponent(Sprite); art.sizeMode = Sprite.SizeMode.CUSTOM;
-    // Keep labels code-drawn for now: they remain sharp across every phone aspect ratio.
+    if (id !== 'start') {
+      resources.load(`art/lobby-icon-${id}-v1/spriteFrame`, SpriteFrame, (error, frame) => { if (!error && frame && art.isValid) art.spriteFrame = frame; });
+      titleLabel.node.active = false; subLabel.node.active = false;
+    }
     (node as Node & { buttonColor?: Color }).buttonColor = color;
     this.buttons.push({ id, node, graphics, title: titleLabel, subtitle: subLabel, art, width: 0, height: 0, x: 0, y: 0 });
   }
@@ -90,6 +96,11 @@ export class LobbyLayer {
     const button = this.buttons.find((item) => item.id === id)!;
     button.x = x; button.y = y; button.width = width; button.height = height; button.node.setPosition(x, y);
     button.node.getComponent(UITransform)!.setContentSize(width, height);
+    if (id !== 'start') {
+      button.graphics.clear();
+      button.art.node.getComponent(UITransform)!.setContentSize(width * 1.18, height * 1.18); button.art.node.setPosition(0, 0);
+      return;
+    }
     const color = (button.node as Node & { buttonColor?: Color }).buttonColor!;
     button.graphics.clear(); button.graphics.fillColor = new Color(50, 49, 34, 135); button.graphics.roundRect(-width / 2 + 2, -height / 2 - 5, width, height, height / 2); button.graphics.fill();
     button.graphics.fillColor = new Color(255, 244, 194); button.graphics.roundRect(-width / 2 - 3, -height / 2 - 3, width + 6, height + 6, height / 2 + 3); button.graphics.fill();

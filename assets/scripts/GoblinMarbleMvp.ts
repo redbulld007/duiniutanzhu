@@ -158,6 +158,7 @@ export class GoblinMarbleMvp extends Component {
     if(action==='notice'){this.lobby.showModal('牧场公告','欢迎来到对牛弹珠！\n绿色、蓝色、灰色牛铃依次得 3、2、1 分。\n撞到特殊钉子会发生惊喜变化。');return;}
     if(action==='guide'){this.lobby.showModal('玩法说明','每关拥有有限弹珠，达成目标分数才能过关。\n过关后基础弹珠 +1，并可选择一种强化。\n紫色钉子重置普通钉子；橙色钉子触发附近目标。');return;}
     if(action==='invite'){this.lobby.showModal('邀请好友','分享入口已预留。接入抖音 AppID 后，可调用平台分享能力邀请好友一起来闯关。');return;}
+    if(action==='settings'){this.lobby.showModal('设置','音乐、音效与震动开关将在下一轮 UI 中接入。\n当前碰撞音效已可正常播放。');return;}
     this.lobby.showModal('添加到桌面','此入口将在抖音真机环境中调用“添加到桌面”能力；浏览器预览中无需操作。');
   }
   private async claimSupply(){if(!RewardedAdBridge.isConfigured){this.lobby.showModal('免费补给','激励视频广告位尚未配置。接入广告位后，完整观看即可领取 30 牛币。');return;}const rewarded=await RewardedAdBridge.show('lobby_free_supply');if(!rewarded){this.lobby.showModal('暂未领取','广告未完整播放，请稍后再试。');return;}this.coins+=30;sys.localStorage.setItem('cow-marble-coins',String(this.coins));GameTelemetry.track('supply_claim',{coins:30,total:this.coins});this.lobby.showModal('补给到账','获得 30 牛币！');}
