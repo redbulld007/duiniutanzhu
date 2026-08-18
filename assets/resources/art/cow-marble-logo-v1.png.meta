@@ -1,0 +1,134 @@
+{
+  "ver": "1.0.27",
+  "importer": "image",
+  "imported": true,
+  "uuid": "b9b2c1b9-4690-42c8-acde-71a42415fe0f",
+  "files": [
+    ".json",
+    ".png"
+  ],
+  "subMetas": {
+    "6c48a": {
+      "importer": "texture",
+      "uuid": "b9b2c1b9-4690-42c8-acde-71a42415fe0f@6c48a",
+      "displayName": "cow-marble-logo-v1",
+      "id": "6c48a",
+      "name": "texture",
+      "userData": {
+        "wrapModeS": "clamp-to-edge",
+        "wrapModeT": "clamp-to-edge",
+        "imageUuidOrDatabaseUri": "b9b2c1b9-4690-42c8-acde-71a42415fe0f",
+        "isUuid": true,
+        "visible": false,
+        "minfilter": "linear",
+        "magfilter": "linear",
+        "mipfilter": "none",
+        "anisotropy": 0
+      },
+      "ver": "1.0.22",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    },
+    "f9941": {
+      "importer": "sprite-frame",
+      "uuid": "b9b2c1b9-4690-42c8-acde-71a42415fe0f@f9941",
+      "displayName": "cow-marble-logo-v1",
+      "id": "f9941",
+      "name": "spriteFrame",
+      "userData": {
+        "trimThreshold": 1,
+        "rotated": false,
+        "offsetX": 7,
+        "offsetY": -63.5,
+        "trimX": 14,
+        "trimY": 127,
+        "width": 1658,
+        "height": 814,
+        "rawWidth": 1672,
+        "rawHeight": 941,
+        "borderTop": 0,
+        "borderBottom": 0,
+        "borderLeft": 0,
+        "borderRight": 0,
+        "packable": true,
+        "pixelsToUnit": 100,
+        "pivotX": 0.5,
+        "pivotY": 0.5,
+        "meshType": 0,
+        "vertices": {
+          "rawPosition": [
+            -829,
+            -407,
+            0,
+            829,
+            -407,
+            0,
+            -829,
+            407,
+            0,
+            829,
+            407,
+            0
+          ],
+          "indexes": [
+            0,
+            1,
+            2,
+            2,
+            1,
+            3
+          ],
+          "uv": [
+            14,
+            814,
+            1672,
+            814,
+            14,
+            0,
+            1672,
+            0
+          ],
+          "nuv": [
+            0.008373205741626795,
+            0,
+            1,
+            0,
+            0.008373205741626795,
+            0.8650371944739639,
+            1,
+            0.8650371944739639
+          ],
+          "minPos": [
+            -829,
+            -407,
+            0
+          ],
+          "maxPos": [
+            829,
+            407,
+            0
+          ]
+        },
+        "isUuid": true,
+        "imageUuidOrDatabaseUri": "b9b2c1b9-4690-42c8-acde-71a42415fe0f@6c48a",
+        "atlasUuid": "",
+        "trimType": "auto"
+      },
+      "ver": "1.0.12",
+      "imported": true,
+      "files": [
+        ".json"
+      ],
+      "subMetas": {}
+    }
+  },
+  "userData": {
+    "type": "sprite-frame",
+    "fixAlphaTransparencyArtifacts": false,
+    "hasAlpha": true,
+    "redirect": "b9b2c1b9-4690-42c8-acde-71a42415fe0f@6c48a"
+  }
+}

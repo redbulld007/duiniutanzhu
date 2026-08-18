@@ -27,14 +27,14 @@ export class LobbyLayer {
     const logoNode = new Node('CowMarbleLogo'); logoNode.parent = this.node; logoNode.addComponent(UITransform); this.logo = logoNode.addComponent(Sprite); this.logo.sizeMode = Sprite.SizeMode.CUSTOM;
     resources.load('art/cow-marble-logo-v1/spriteFrame', SpriteFrame, (error, frame) => { if (!error && frame && this.logo.isValid) this.logo.spriteFrame = frame; });
     this.title = this.label('Title', 52, new Color(255, 246, 208)); this.title.node.active = false;
-    this.status = this.label('Status', 25, new Color(93, 62, 29));
-    this.addButton('start', '开始闯关', '发射弹珠，撞铃得分', new Color(235, 137, 45));
-    this.addButton('daily', '每日补给', '每天领取牛币', new Color(83, 170, 218));
-    this.addButton('supply', '免费补给', '看广告得奖励', new Color(255, 160, 72));
-    this.addButton('notice', '牧场公告', '查看本周消息', new Color(114, 159, 113));
-    this.addButton('guide', '玩法说明', '特殊钉子与弹珠', new Color(128, 121, 208));
-    this.addButton('invite', '邀请好友', '分享牧场乐趣', new Color(225, 110, 143));
-    this.addButton('desktop', '添加到桌面', '下次一键开玩', new Color(80, 151, 178));
+    this.status = this.label('Status', 27, new Color(93, 62, 29));
+    this.addButton('start', '开始闯关', '有限弹珠 · 过关强化', new Color(238, 132, 38));
+    this.addButton('daily', '每日补给', '领取牛币', new Color(72, 172, 221));
+    this.addButton('supply', '弹珠补给', '看视频领取', new Color(111, 190, 93));
+    this.addButton('notice', '牧场公告', '本周活动', new Color(236, 169, 61));
+    this.addButton('guide', '玩法图鉴', '钉子与弹珠', new Color(135, 114, 214));
+    this.addButton('invite', '邀请好友', '分享牧场', new Color(221, 104, 145));
+    this.addButton('desktop', '快捷入口', '添加到桌面', new Color(72, 151, 185));
     this.createModal();
   }
 
@@ -47,17 +47,17 @@ export class LobbyLayer {
     this.width = width; this.height = height;
     const backgroundTransform = this.background.node.getComponent(UITransform)!;
     backgroundTransform.setContentSize(width, height); this.background.node.setPosition(width / 2, height / 2);
-    this.logo.node.setPosition(width / 2, height * .81); const logoWidth = Math.min(width * .76, 620); this.logo.node.getComponent(UITransform)!.setContentSize(logoWidth, logoWidth * .5);
-    this.title.node.setPosition(width / 2, height * .82); this.status.node.setPosition(width / 2, height * .72);
-    // The mascot owns the lower-right area; keep every interactive control on the left.
-    const wide = Math.min(width * .48, 350), small = Math.min(width * .27, 192), h = Math.max(68, height * .072);
-    this.layoutButton('start', width * .33, height * .52, wide, h * 1.15);
-    this.layoutButton('daily', width * .19, height * .425, small, h);
-    this.layoutButton('supply', width * .47, height * .425, small, h);
-    this.layoutButton('notice', width * .19, height * .345, small, h);
-    this.layoutButton('guide', width * .47, height * .345, small, h);
-    this.layoutButton('invite', width * .19, height * .265, small, h);
-    this.layoutButton('desktop', width * .47, height * .265, small, h);
+    this.logo.node.setPosition(width / 2, height * .805); const logoWidth = Math.min(width * .82, 640); this.logo.node.getComponent(UITransform)!.setContentSize(logoWidth, logoWidth * .5);
+    this.title.node.setPosition(width / 2, height * .82); this.status.node.setPosition(width / 2, height * .70);
+    // Clear hierarchy: one dominant play button, then six compact side entrances.
+    const mainW = Math.min(width * .62, 470), mainH = Math.max(94, height * .105), smallW = Math.min(width * .30, 220), smallH = Math.max(70, height * .07);
+    this.layoutButton('start', width * .50, height * .545, mainW, mainH);
+    this.layoutButton('daily', width * .20, height * .59, smallW, smallH);
+    this.layoutButton('supply', width * .80, height * .59, smallW, smallH);
+    this.layoutButton('notice', width * .19, height * .46, smallW, smallH);
+    this.layoutButton('guide', width * .81, height * .46, smallW, smallH);
+    this.layoutButton('invite', width * .22, height * .33, smallW, smallH);
+    this.layoutButton('desktop', width * .50, height * .305, Math.min(width * .42, 320), smallH);
     this.layoutModal();
   }
 
@@ -76,12 +76,12 @@ export class LobbyLayer {
   private addButton(id: LobbyAction, title: string, subtitle: string, color: Color) {
     const node = new Node(`Lobby_${id}`); node.parent = this.node; node.addComponent(UITransform);
     const graphics = node.addComponent(Graphics);
-    const titleLabel = this.label(`${id}_title`, id === 'start' ? 43 : 31, new Color(255, 255, 255)); titleLabel.node.parent = node;
-    const subLabel = this.label(`${id}_subtitle`, id === 'start' ? 18 : 15, new Color(255, 247, 220)); subLabel.node.parent = node;
+    const titleLabel = this.label(`${id}_title`, id === 'start' ? 44 : 28, new Color(255, 255, 255)); titleLabel.node.parent = node;
+    const subLabel = this.label(`${id}_subtitle`, id === 'start' ? 20 : 16, new Color(255, 247, 220)); subLabel.node.parent = node;
     titleLabel.string = title; subLabel.string = subtitle;
     titleLabel.node.setPosition(0, 12); subLabel.node.setPosition(0, -18);
     const artNode = new Node(`${id}_art`); artNode.parent = node; artNode.addComponent(UITransform); const art = artNode.addComponent(Sprite); art.sizeMode = Sprite.SizeMode.CUSTOM;
-    resources.load(`art/lobby-${id}-label/spriteFrame`, SpriteFrame, (error, frame) => { if (!error && frame && art.isValid) { art.spriteFrame = frame; titleLabel.node.active = false; subLabel.node.active = false; } });
+    // Keep labels code-drawn for now: they remain sharp across every phone aspect ratio.
     (node as Node & { buttonColor?: Color }).buttonColor = color;
     this.buttons.push({ id, node, graphics, title: titleLabel, subtitle: subLabel, art, width: 0, height: 0, x: 0, y: 0 });
   }
@@ -91,9 +91,10 @@ export class LobbyLayer {
     button.x = x; button.y = y; button.width = width; button.height = height; button.node.setPosition(x, y);
     button.node.getComponent(UITransform)!.setContentSize(width, height);
     const color = (button.node as Node & { buttonColor?: Color }).buttonColor!;
-    button.graphics.clear(); button.graphics.fillColor = new Color(50, 49, 34, 95); button.graphics.roundRect(-width / 2 + 2, -height / 2 - 3, width, height, height / 2); button.graphics.fill();
+    button.graphics.clear(); button.graphics.fillColor = new Color(50, 49, 34, 135); button.graphics.roundRect(-width / 2 + 2, -height / 2 - 5, width, height, height / 2); button.graphics.fill();
+    button.graphics.fillColor = new Color(255, 244, 194); button.graphics.roundRect(-width / 2 - 3, -height / 2 - 3, width + 6, height + 6, height / 2 + 3); button.graphics.fill();
     button.graphics.fillColor = color; button.graphics.roundRect(-width / 2, -height / 2, width, height, height / 2); button.graphics.fill();
-    button.graphics.fillColor = new Color(255, 255, 255, 38); button.graphics.roundRect(-width / 2 + 5, 2, width - 10, height / 2 - 7, height / 3); button.graphics.fill();
+    button.graphics.fillColor = new Color(255, 255, 255, 58); button.graphics.roundRect(-width / 2 + 6, 3, width - 12, height / 2 - 8, height / 3); button.graphics.fill();
     button.title.node.setPosition(0, height > 75 ? 15 : 10); button.subtitle.node.setPosition(0, height > 75 ? -22 : -17);
     button.art.node.getComponent(UITransform)!.setContentSize(width * .9, height * .76); button.art.node.setPosition(0, 0);
   }
