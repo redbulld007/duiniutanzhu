@@ -8,13 +8,15 @@ import { UpgradeKind, UpgradeLayer } from './UpgradeLayer';
 import { HeroId } from './HeroCatalog';
 import { HeroSelectionLayer } from './HeroSelectionLayer';
 import { UpgradeDefinition, UpgradeId, rollUpgrades } from './UpgradeCatalog';
+import { BUILTIN_LAYOUTS, LevelLayout, loadCustomLayout } from './LevelLayout';
+import { LevelEditorLayer } from './LevelEditorLayer';
 const { ccclass } = _decorator;
 type Peg = { pos: Vec2 };
 
 /** Original pinball roguelite MVP. Attach this to Canvas. */
 @ccclass('GoblinMarbleMvp')
 export class GoblinMarbleMvp extends Component {
-  private root!: Node; private g!: Graphics; private guide!: Graphics; private hud!: Label; private tip!: Label; private home!: Label; private lobby!: LobbyLayer; private upgrades!: UpgradeLayer; private heroes!: HeroSelectionLayer;
+  private root!: Node; private g!: Graphics; private guide!: Graphics; private hud!: Label; private tip!: Label; private home!: Label; private lobby!: LobbyLayer; private upgrades!: UpgradeLayer; private heroes!: HeroSelectionLayer; private editor!: LevelEditorLayer;
   private backgroundVisual!: Sprite; private boardFrameVisual!: Sprite; private boardVisuals!: Node; private actorVisuals!: Node; private launcherVisual!: Sprite; private ballVisual!: Sprite; private cloneVisual!: Sprite;
   private pegVisuals = new Map<number, Sprite>(); private resetVisual!: Sprite; private bombVisual!: Sprite;
   private size = new Vec2(); private launcher = new Vec2(); private pointer = new Vec2();
@@ -51,6 +53,7 @@ export class GoblinMarbleMvp extends Component {
     this.lobby = new LobbyLayer(this.root, (action) => this.onLobbyAction(action));
     this.upgrades = new UpgradeLayer(this.root, (kind) => { void this.chooseUpgrade(kind); });
     this.heroes = new HeroSelectionLayer(this.root, (hero) => this.chooseHero(hero));
+    this.editor = new LevelEditorLayer(this.root, (layout) => this.useEditedLayout(layout));
     input.on(Input.EventType.TOUCH_START, this.down, this); input.on(Input.EventType.TOUCH_MOVE, this.move, this); input.on(Input.EventType.TOUCH_END, this.up, this);
   }
   start() { this.resize(); this.setupPhysics(); this.board(); this.tip.string = '从顶部向下拖动，松开发射'; this.openLobby(); GameTelemetry.track('game_start', { stage: this.stage, bestStage: this.bestStage }); }
@@ -95,14 +98,15 @@ export class GoblinMarbleMvp extends Component {
     if(this.lobby)this.lobby.resize(this.size.x,this.size.y);
     if(this.upgrades)this.upgrades.resize(this.size.x,this.size.y);
     if(this.heroes)this.heroes.resize(this.size.x,this.size.y);
+    if(this.editor)this.editor.resize(this.size.x,this.size.y);
   }
   private board() {
     if (this.physicsRoot) this.physicsRoot.removeAllChildren();
     if (this.physicsRoot) { this.physicsRoot.addChild(this.ballNode); this.physicsRoot.addChild(this.cloneNode); this.ballNode.active = false; this.cloneNode.active=false; }
-    this.hit.clear(); this.pegColliders.clear(); this.bombUsed=false; this.pegs=[]; const layout=(this.stage-1)%3; const cols=[7,8,9][layout], rows=[8,9,10][layout], width=this.playRight-this.playLeft, left=this.playLeft, top=this.launcher.y-92, bottom=this.playBottom+84, gapX=width/(cols-1), gapY=(top-bottom)/(rows-1);
-    for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) { const x=left+c*gapX+(r%2?gapX/2:0); if(x>this.playLeft+8&&x<this.playRight-8&&!(r===0&&Math.abs(x-this.size.x/2)<gapX*.7)) this.pegs.push({pos:new Vec2(x,top-r*gapY)}); }
+    this.hit.clear(); this.pegColliders.clear(); this.bombUsed=false; this.pegs=[]; const layoutIndex=(this.stage-1)%BUILTIN_LAYOUTS.length; const layout=loadCustomLayout() ?? BUILTIN_LAYOUTS[layoutIndex]; const top=this.launcher.y-92, bottom=this.playBottom+84;
+    layout.pegs.filter((peg)=>peg.type==='normal').forEach((peg) => this.pegs.push({pos:new Vec2(this.playLeft+peg.x*(this.playRight-this.playLeft), bottom+peg.y*(top-bottom))}));
     this.pegs.forEach((peg, i) => this.pegColliders.set(i, PhysicsBoardFactory.circle(this.physicsRoot, `Peg_${i}`, peg.pos, this.pegR, i + 1)));
-    const specialPositions=[[.24,.47,.76,.57],[.76,.43,.25,.63],[.5,.55,.78,.35]][layout];
+    const specialPositions=[[.24,.47,.76,.57],[.76,.43,.25,.63],[.5,.55,.78,.35]][layoutIndex];
     this.resetPeg.set(this.playLeft+(this.playRight-this.playLeft)*specialPositions[0], this.playBottom+(this.playTop-this.playBottom)*specialPositions[1]); this.bombPeg.set(this.playLeft+(this.playRight-this.playLeft)*specialPositions[2], this.playBottom+(this.playTop-this.playBottom)*specialPositions[3]);
     PhysicsBoardFactory.circle(this.physicsRoot, 'ResetPeg', this.resetPeg, this.pegR + 3, 201);
     PhysicsBoardFactory.circle(this.physicsRoot, 'BombPeg', this.bombPeg, this.pegR + 3, 202);
@@ -118,6 +122,7 @@ export class GoblinMarbleMvp extends Component {
     this.pointer.set(e.getUILocation().x,e.getUILocation().y);
     if(this.lobby.visible){this.lobby.handleTap(this.pointer.x,this.pointer.y);return;}
     if(this.heroes.visible){this.heroes.handleTap(this.pointer.x,this.pointer.y);return;}
+    if(this.editor.visible){this.editor.handleTap(this.pointer.x,this.pointer.y);return;}
     if(this.upgrades.visible){this.upgrades.handleTap(this.pointer.x,this.pointer.y);return;}
     if(this.flying||this.resolving) return;
     if(this.pointer.x<130&&this.pointer.y>this.size.y-82){this.openLobby();return;}
@@ -167,11 +172,12 @@ export class GoblinMarbleMvp extends Component {
     if(action==='notice'){this.lobby.showModal('牧场公告','欢迎来到对牛弹珠！\n绿色、蓝色、灰色牛铃依次得 3、2、1 分。\n撞到特殊钉子会发生惊喜变化。');return;}
     if(action==='guide'){this.lobby.showModal('玩法说明','每关拥有有限弹珠，达成目标分数才能过关。\n过关后基础弹珠 +1，并可选择一种强化。\n紫色钉子重置普通钉子；橙色钉子触发附近目标。');return;}
     if(action==='invite'){this.lobby.showModal('邀请好友','分享入口已预留。接入抖音 AppID 后，可调用平台分享能力邀请好友一起来闯关。');return;}
-    if(action==='settings'){this.lobby.showModal('设置','音乐、音效与震动开关将在下一轮 UI 中接入。\n当前碰撞音效已可正常播放。');return;}
+    if(action==='settings'){this.editor.show(loadCustomLayout());return;}
     this.lobby.showModal('添加到桌面','此入口将在抖音真机环境中调用“添加到桌面”能力；浏览器预览中无需操作。');
   }
   private async claimSupply(){if(!RewardedAdBridge.isConfigured){this.lobby.showModal('免费补给','激励视频广告位尚未配置。接入广告位后，完整观看即可领取 30 牛币。');return;}const rewarded=await RewardedAdBridge.show('lobby_free_supply');if(!rewarded){this.lobby.showModal('暂未领取','广告未完整播放，请稍后再试。');return;}this.coins+=30;sys.localStorage.setItem('cow-marble-coins',String(this.coins));GameTelemetry.track('supply_claim',{coins:30,total:this.coins});this.lobby.showModal('补给到账','获得 30 牛币！');}
   private chooseHero(hero:HeroId){this.selectedHero=hero;this.ballRadius=16;this.launchSpeed=760;this.forcedSplit=false;this.heroEchoAvailable=false;if(hero==='oldOx')this.ballRadius=24;if(hero==='milkCow')this.forcedSplit=true;if(hero==='calf')this.launchSpeed=915;this.applyBallRadius();this.heroes.hide();this.lobby.hide();this.tip.string=`${hero==='oldOx'?'老黄牛巨型弹珠':hero==='grandpaBull'?'牛爷爷回响弹珠':hero==='milkCow'?'奶牛分裂弹珠':'牛犊子冲刺弹珠'}已就位！向下拖动发射`;GameTelemetry.track('hero_selected',{hero});}
+  private useEditedLayout(layout:LevelLayout){this.targetScore=layout.target;this.board();this.lobby.hide();this.tip.string='自定义布局已保存并加载，向下拖动开始测试';}
   private applyBallRadius(){if(!this.ballCollider)return;this.ballCollider.radius=this.ballRadius;this.ballCollider.apply();this.cloneCollider.radius=this.ballRadius*.82;this.cloneCollider.apply();}
   private saveOrLose(ball:Node){if(this.milkShieldAvailable&&ball===this.ballNode){this.milkShieldAvailable=false;ball.setPosition(this.launcher.x,this.playBottom+130);this.ballBody.linearVelocity=new Vec2(0,450);this.tip.string='奶泡护盾救回弹珠！';return;}ball.active=false;}
   private applyMagnet(){if(!this.magnetStrength)return;const body=this.ballBody;if(!this.ballNode.active)return;let best:Vec2|undefined;let distance=999;this.pegs.forEach((peg,index)=>{if((this.hit.get(index)??0)>=this.maxHitsPerPeg)return;const d=peg.pos.clone().subtract(this.ball);const len=d.length();if(len<distance){distance=len;best=d;}});if(best&&distance<210){best.normalize();body.linearVelocity=body.linearVelocity.add(best.multiplyScalar(this.magnetStrength*.018));}}
